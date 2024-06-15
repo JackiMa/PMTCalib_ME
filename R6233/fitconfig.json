@@ -1,0 +1,11 @@
+{
+    "DataFileName": "/root/code/R6233-example.txt",
+    "FitRange": [-0.01, 0],
+    "GuessValue": [1.5, 0, 0, 0, 0, 0, 0],
+    "PdfName": "",
+    "notes for FitRange": "unit in nVs. If value is [0,0], FitRange will be set by the range of data.",
+    "notes for GuessValue": "if value != 0: fit parameters: [mean of phoele, pos of Pedestal, sigma of Pedestal, Q1, sigma1, alpha, w]",
+    "notes for GuessValue2": "however [Q1, sigma1, alpha, w] cannot be set by the user at the moment. They can only be obtained through fitting. (I haven't fixed it yet.)",
+    "notes for PdfName": "If keep it empty, the pdf will be saved with DataFileName as the name.",
+    "notes" : "I haven't figured out how to set up the NOTEs yet, so I'm using this strange method for now ....."
+}

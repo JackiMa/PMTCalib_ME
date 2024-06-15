@@ -1,0 +1,19 @@
+[ lib/libPMTCalib.so ]
+# List of selected classes
+class DFTmethod
+class NumIntegration
+class PMT
+class PMTModel
+class Pedestal
+class SPEFitter
+class SPEResponse
+header DFTmethod.h
+header NumIntegration.h
+header PMT.h
+header PMTModel.h
+header Pedestal.h
+header SPEFitter.h
+header SPEResponse.h
+# List of selected namespaces
+namespace PMType
+namespace PMTStyle
