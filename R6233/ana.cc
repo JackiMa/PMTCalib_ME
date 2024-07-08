@@ -478,7 +478,7 @@ Int_t project0(TString ConfigFile)
     pt->Draw();
 
     TString saveName;
-    if (config.pdfName == "")
+    if (config.pdfName == "" || config.pdfName == "1") // 默认保存文件名
     {
         TString fileName = gSystem->BaseName(config.dataFileName);
         Ssiz_t dotPos = fileName.Last('.');
@@ -487,12 +487,21 @@ Int_t project0(TString ConfigFile)
             fileName.Remove(dotPos);
         }
         saveName = Form("%s_Gain=%fnVs.pdf", fileName.Data(), Gain);
+        c1->Print(saveName);
+        if (config.pdfName == "1"){     // 如果pdfName为1，那么保存完文件后不交互
+            return 0;
+        }
+    }
+    else if (config.pdfName == "-1") // 如果pdfName为-1，不保存文件
+    {
+        saveName = config.pdfName;
     }
     else
     {
         saveName = config.pdfName;
+        c1->Print(saveName);
     }
-    c1->Print(saveName);
+    
 
     cout << " ... the macro ends ! " << endl;
 
@@ -508,6 +517,8 @@ Int_t project0(TString ConfigFile)
     cout << "" << endl;
 
     // Interact with users
+    // 这是一个循坏，会一直等待用户输入，直到退出。所以会非常占用资源。
+    // TODO 优化这部分实现逻辑，降低资源占用
     bool continueLoop = true;
     while (continueLoop)
     {
