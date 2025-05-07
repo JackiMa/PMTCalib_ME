@@ -45,6 +45,8 @@ public:
     FitRange fitRange;
     FitParams guessValue;
     TString pdfName;
+    Bool_t drawComponents;     // 是否绘制光电子组分
+    Int_t componentsNumber;    // 绘制的光电子组分数量
 };
 
 Config read_config(TString filename)
@@ -59,6 +61,19 @@ Config read_config(TString filename)
     TArrayD GuessValue(7, j["GuessValue"].get<std::vector<Double_t>>().data());
     TString pdfName = j["PdfName"].get<std::string>().c_str();
 
+    // 读取组分绘制相关的配置
+    Bool_t drawComponents = true;  // 默认值为true
+    Int_t componentsNumber = 5;    // 默认值为5
+    
+    // 检查配置文件中是否存在这些项目
+    if (j.contains("DrawComponents")) {
+        drawComponents = j["DrawComponents"].get<bool>();
+    }
+    
+    if (j.contains("ComponentsNumber")) {
+        componentsNumber = j["ComponentsNumber"].get<int>();
+    }
+
     config.dataFileName = DataFileName;
     config.fitRange.xmin = FitRange[0];
     config.fitRange.xmax = FitRange[1];
@@ -70,6 +85,9 @@ Config read_config(TString filename)
     config.guessValue.alpha = GuessValue[5];
     config.guessValue.w = GuessValue[6];
     config.pdfName = pdfName;
+    config.drawComponents = drawComponents;
+    config.componentsNumber = componentsNumber;
+    
     cout << "DataFileName: " << DataFileName << endl;
     cout << "FitRange: " << FitRange[0] << ", " << FitRange[1] << endl;
     cout << "GuessValue: ";
@@ -78,6 +96,9 @@ Config read_config(TString filename)
         cout << GuessValue[i] << ", ";
     }
     cout << endl;
+    cout << "DrawComponents: " << (drawComponents ? "true" : "false") << endl;
+    cout << "ComponentsNumber: " << componentsNumber << endl;
+    
     return config;
 }
 
@@ -160,6 +181,8 @@ void skipUntilDataStarts(std::ifstream &input)
  * @param file Path to the input file.
  * @param fitRange Range of x values to fit.
  * @return Data object containing the read data.
+ * 
+ * 读取并解析数据文件，支持多种分隔符格式，并应用拟合范围过滤
  */
 Data getData(TString file, FitRange fitRange)
 {
@@ -242,6 +265,8 @@ Data getData(TString file, FitRange fitRange)
  * @param xmax Maximum x value.
  * @param file Path to the input file.
  * @return Pointer to the created histogram.
+ * 
+ * 根据数据创建直方图，设置适当的样式和误差
  */
 TH1D *get_histo(Data &data, Double_t wbin)
 {
@@ -276,6 +301,8 @@ TH1D *get_histo(Data &data, Double_t wbin)
 /**
  * @brief Main function to process and fit histograms.
  * @return Status code.
+ * 
+ * 完整的PMT电荷谱拟合流程，包括数据读取、参数估计、拟合和结果绘制
  */
 Int_t project0(TString ConfigFile)
 {
@@ -345,10 +372,12 @@ Int_t project0(TString ConfigFile)
     Pedestal ped(QQ, s0);
     ped.LocatePedestal(hSG[run], QQ, s0);
 
+    // 估计初始参数
     Double_t mu_test = fit.FindMu(hSG[run], ped.Q0, ped.s0);
     Double_t g_test = fit.FindG(hSG[run], ped.Q0, mu_test);
     Double_t p_test[4] = {g_test, 0.3 * g_test, 1.0 / (0.5 * g_test), 0.2};
 
+    // 设置拟合方法和初始参数
     SPEResponse gauss_test(PMType::GAUSS, p_test);
     DFTmethod dft(2.0 * nbins, xmin, xmax, gauss_test);
     dft.wbin = hSG[run]->GetBinWidth(1);
@@ -362,6 +391,7 @@ Int_t project0(TString ConfigFile)
     fit.SetDFTmethod(dft);
     fit.FitwDFTmethod(hSG[run]);
 
+    // 提取拟合结果
     dft.Norm = fit.vals[0];
     dft.Q0 = fit.vals[1];
     dft.s0 = fit.vals[2];
@@ -370,9 +400,35 @@ Int_t project0(TString ConfigFile)
     Double_t p_fit[4] = {fit.vals[4], fit.vals[5], fit.vals[6], fit.vals[7]};
     dft.spef.SetParams(p_fit);
 
+    // 绘制拟合结果
     TGraph *grBF = dft.GetGraph();
     grBF->Draw("SAME,L");
-
+    
+    // 根据配置来决定是否添加各个光电子组分曲线
+    if (config.drawComponents) {
+        // 添加各个光电子组分曲线(使用更粗的灰色虚线)
+        Int_t lineWidth = 2;  // 更粗的线宽
+        
+        // 绘制指定数量的光电子组分
+        Int_t maxComponents = config.componentsNumber;
+        
+        for (Int_t n = 0; n < maxComponents; n++) {
+            // 使用GetGraphN获取准确的组分曲线
+            TGraph* grN = dft.GetGraphN(n);
+            if (!grN) continue;  // 防止空指针
+            
+            grN->SetLineStyle(2);  // 虚线
+            grN->SetLineColor(kGray+1);
+            grN->SetLineWidth(lineWidth);
+            grN->Draw("SAME,L");
+            
+            // 这里需要手动删除TGraph对象，因为GetGraphN会在堆上创建新对象
+            // 但由于ROOT会管理绘制对象，所以需要使用TGraph::SetDeleteAfterUse
+            // 以防止删除正在使用的对象
+            grN->SetBit(kCanDelete);  // 让ROOT在不再需要时自动删除此对象
+        }
+    }
+    
     pad2->cd();
 
     TH1F *hp = new TH1F("pull", "", nbins, xmin, xmax);
@@ -437,6 +493,7 @@ Int_t project0(TString ConfigFile)
     Double_t a = fit.vals[6];
     Double_t w = fit.vals[7];
 
+    // 计算修正后的增益
     Double_t gn = 0.5 * TMath::Erfc(-Q / (sqrt(2.0) * s));
     Double_t k = s / gn / sqrt(2.0 * TMath::Pi()) * TMath::Exp(-pow(Q, 2.0) / (2.0 * pow(s, 2.0)));
     Double_t Qf = Q + k;
@@ -502,7 +559,6 @@ Int_t project0(TString ConfigFile)
         c1->Print(saveName);
     }
     
-
     cout << " ... the macro ends ! " << endl;
 
     time_t end;
@@ -519,22 +575,22 @@ Int_t project0(TString ConfigFile)
     // Interact with users
     // 这是一个循坏，会一直等待用户输入，直到退出。所以会非常占用资源。
     // TODO 优化这部分实现逻辑，降低资源占用
-    bool continueLoop = true;
-    while (continueLoop)
-    {
-        TObject *selectedObject = c1->WaitPrimitive();
+    // bool continueLoop = true;
+    // while (continueLoop)
+    // {
+    //     TObject *selectedObject = c1->WaitPrimitive();
 
-        if (selectedObject && selectedObject->InheritsFrom(TText::Class()))
-        {
-            TText *text = (TText *)selectedObject;
-            if (std::string(text->GetTitle()) == "exit")
-            {
-                continueLoop = false;
-            }
-        }
+    //     if (selectedObject && selectedObject->InheritsFrom(TText::Class()))
+    //     {
+    //         TText *text = (TText *)selectedObject;
+    //         if (std::string(text->GetTitle()) == "exit")
+    //         {
+    //             continueLoop = false;
+    //         }
+    //     }
 
-        c1->Update();
-    }
+    //     c1->Update();
+    // }
 
     return 0;
 }

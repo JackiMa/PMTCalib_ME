@@ -1,4 +1,3 @@
-
 #ifndef DFTMETHOD_H
 #define DFTMETHOD_H
 
@@ -61,6 +60,9 @@ class DFTmethod : public TObject
   Double_t fftPhase( Double_t vy, Double_t vz );
   void CalculateValues();
   Double_t GetValue( Double_t xx );
+
+  // 获取特定光电子数量n的组分在位置x处的值
+  Double_t GetComponentValue( Double_t xx, Int_t n );
 
   TGraph* GetGraph();
   TGraph* GetGraphN( Int_t n );

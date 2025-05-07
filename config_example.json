@@ -1,0 +1,17 @@
+{
+    "DataFileName": "R6233-example.txt",
+    "FitRange": [0, 20],
+    "histogram_bins": 400,
+    "model_type": "EXPTRUNCG",
+    "initial_params": {
+        "Q0": 3.0,
+        "s0": 0.8,
+        "mu": 0.5,
+        "Q1": 6.5,
+        "s1": 1.5,
+        "alpha": 2.0,
+        "w": 0.3
+    },
+    "PdfName": "",
+    "debug_level": 1
+}

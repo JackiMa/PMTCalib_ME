@@ -26,7 +26,13 @@ so = g++
 soflags = -g -shared -fPIC
 libs = $(ROOTLIBS) -lMinuit -lMinuit2 -lGeom -lXMLIO -lfftw3 -L/$(GSL)/lib -lgsl -lgslcblas 
 
-all	: start $(dict).cc $(objs) $(lib) end
+all	: start touch_dftmethod $(dict).cc $(objs) $(lib) end
+
+# 添加touch_dftmethod，确保每次编译时DFTmethod.cc都会被重新编译
+touch_dftmethod:
+	@touch src/DFTmethod.cc
+	@echo ' * Touching DFTmethod.cc to force recompilation'
+	@echo ''
 
 start	: 
 	@echo ''		
@@ -69,5 +75,7 @@ clean	:
 	@rm -f ./$(lib)
 	@rm -f ./$(lib:.so=_rdict.pcm)
 	@rm -f ./$(lib:.so=.rootmap)
+	@rm -f R6233/*.o
+	@rm -f R6233/*-exec
 
-fresh 	: clean all 
+fresh 	: clean all

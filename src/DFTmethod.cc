@@ -1,4 +1,3 @@
-
 #include "DFTmethod.h"
 
 using namespace std;
@@ -260,4 +259,34 @@ Double_t DFTmethod::fftPhase( Double_t vy, Double_t vz )
   
   return thetayz;
 
+}
+
+// Double_t DFTmethod::GetComponentValue( Double_t xx, Int_t n )
+// {
+//   // 所有组分共同的系数
+//   Double_t commonFactor = TMath::Exp(-mu) * pow(mu, n) / TMath::Factorial(n);
+  
+//   // 对于0光电子，返回pedestal的高斯分布乘以系数
+//   if (n == 0) {
+//     Double_t arg = (xx - Q0) / s0;
+//     Double_t gaussValue = (1.0 / (sqrt(2.0 * TMath::Pi()) * s0)) * TMath::Exp(-0.5 * arg * arg);
+//     return commonFactor * gaussValue;
+//   } 
+//   // 对于n>0，我们使用一个简化的近似
+//   else {
+//     // 获取SPE参数
+//     Double_t Q1 = spef.params[0];  // 单光电子响应的中心(假设在参数数组的第一个位置)
+//     Double_t sigma1 = spef.params[1];  // 单光电子响应的宽度(假设在参数数组的第二个位置)
+    
+//     // 对于多光电子，响应的中心是Q0 + n*Q1
+//     Double_t mean = Q0 + n * Q1;
+//     // 宽度近似为：sqrt(s0^2 + n*sigma1^2)，考虑统计叠加
+//     Double_t sigma = sqrt(pow(s0, 2) + n * pow(sigma1, 2));
+    
+//     // 使用高斯分布近似多光电子响应
+//     Double_t arg = (xx - mean) / sigma;
+//     Double_t gaussValue = (1.0 / (sqrt(2.0 * TMath::Pi()) * sigma)) * TMath::Exp(-0.5 * arg * arg);
+    
+//     return commonFactor * gaussValue;
+//   }
 }

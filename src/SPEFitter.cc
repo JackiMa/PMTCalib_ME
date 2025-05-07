@@ -1,20 +1,27 @@
-
 #include "SPEFitter.h"
 
 using namespace std;
 
-Int_t N;
-double xx0[7500];
-double yy0[7500];
+// 全局变量，用于拟合函数
+Int_t N;                  // 数据点数量
+double xx0[7500];         // 数据点x坐标数组
+double yy0[7500];         // 数据点y坐标数组
 
-double wbin0;
+double wbin0;             // bin宽度
 
-NumIntegration num0;
-DFTmethod dft0;
-PMTModel mod0;
+NumIntegration num0;      // 数值积分方法实例
+DFTmethod dft0;           // 离散傅里叶变换方法实例
+PMTModel mod0;            // PMT模型实例
 
-Int_t Nb;
+Int_t Nb;                 // 有效bin数量(y>0)
 
+/**
+ * @brief 数值积分方法的拟合函数
+ * @param x 参数数组
+ * @return 卡方值
+ * 
+ * 该函数使用数值积分方法计算模型值，并与数据比较计算卡方
+ */
 double fit_func_num( const double *x )
 {
   double result = 0.0;
@@ -38,6 +45,7 @@ double fit_func_num( const double *x )
   
   num0.CalculateValues();
 
+  // 计算卡方
   for ( Int_t i=0; i<N; i++ )
     {
       if ( yy0[i]>0 )
@@ -55,6 +63,13 @@ double fit_func_num( const double *x )
   
 }
 
+/**
+ * @brief 离散傅里叶变换方法的拟合函数
+ * @param x 参数数组
+ * @return 卡方值
+ * 
+ * 该函数使用离散傅里叶变换方法计算模型值，并与数据比较计算卡方
+ */
 double fit_func_fft( const double *x )
 {
   double result = 0.0;
@@ -95,6 +110,13 @@ double fit_func_fft( const double *x )
   
 }
 
+/**
+ * @brief PMT模型方法的拟合函数
+ * @param x 参数数组
+ * @return 卡方值
+ * 
+ * 该函数使用PMT模型计算模型值，并与数据比较计算卡方
+ */
 double fit_func_mod( const double *x )
 {
   double result = 0.0;
@@ -122,6 +144,14 @@ double fit_func_mod( const double *x )
   
 }
 
+/**
+ * @brief 高斯函数，用于基座拟合
+ * @param x 电荷值
+ * @param par 参数数组
+ * @return 高斯函数值
+ * 
+ * 用于拟合基座(pedestal)的标准高斯函数
+ */
 Double_t m_g( Double_t *x, Double_t *par )
 {
   Double_t xx = x[0];
@@ -175,8 +205,19 @@ void SPEFitter::SetPMTModel( PMTModel _mod )
   
 }
 
+/**
+ * @brief 估计平均光电子数μ
+ * @param hspec 电荷谱直方图
+ * @param _Q0 基座中心位置
+ * @param _s0 基座宽度
+ * @return 估计的平均光电子数μ
+ * 
+ * 通过拟合基座并计算基座与总电荷谱的比例来估计μ值
+ * μ = ln(Ntot/Nped)，基于泊松分布中0光电子的概率P(0)=e^(-μ)
+ */
 Double_t SPEFitter::FindMu( TH1 *hspec, Double_t _Q0, Double_t _s0 )
 {
+  // 创建基座拟合函数
   ped_func = new TF1( "pmt_ped", m_g, _Q0-5.0*_s0, _Q0-5.0*_s0, 3 );
   ped_func->SetParNames( "Norm", "Q", "#sigma" );
   ped_func->SetLineColor( kRed );
@@ -186,22 +227,34 @@ Double_t SPEFitter::FindMu( TH1 *hspec, Double_t _Q0, Double_t _s0 )
   
   Double_t Norm = hspec->Integral();
   
+  // 设置拟合初始参数
   ped_func->SetParameter( 0, Norm );
   ped_func->SetParLimits( 0, Norm*0.01, Norm*100.0 );
 
   ped_func->SetParameter( 1, _Q0 ); ped_func->SetParLimits( 1, _Q0-2.0*_s0, _Q0+2.0*_s0 );
   ped_func->SetParameter( 2, _s0 ); ped_func->SetParLimits( 2, _s0*0.9, _s0*1.1 );
   
-  
+  // 拟合基座区域
   hspec->Fit( "pmt_ped", "Q0", "", _Q0-3.0*_s0, _Q0+1.8*_s0 );  
   
   Double_t *pars0 = ped_func->GetParameters();
+  // 计算μ = ln(Ntot/Nped)
   Double_t _mu = TMath::Log( Norm/pars0[0] );
       
   return _mu;
   
 }
 
+/**
+ * @brief 估计PMT增益
+ * @param hspec 电荷谱直方图
+ * @param _Q0 基座中心位置
+ * @param _mu 平均光电子数
+ * @return 估计的PMT增益
+ * 
+ * 通过谱的平均值与基座位置的差除以平均光电子数来估计增益
+ * G = (Mean - Q0)/μ
+ */
 Double_t SPEFitter::FindG( TH1 *hspec, Double_t _Q0, Double_t _mu )
 {
   Double_t G = ( hspec->GetMean()-_Q0 )/_mu;
@@ -210,8 +263,15 @@ Double_t SPEFitter::FindG( TH1 *hspec, Double_t _Q0, Double_t _mu )
   
 }
 
+/**
+ * @brief 使用数值积分方法进行拟合
+ * @param hspec 电荷谱直方图
+ * 
+ * 使用数值积分方法对PMT电荷谱进行完整拟合，提取所有参数
+ */
 void SPEFitter::FitwNummethod( TH1 *hspec )
 {
+  // 获取直方图信息
   N = hspec->GetXaxis()->GetNbins();
   wbin0 = hspec->GetXaxis()->GetBinWidth(1);
 
@@ -220,6 +280,7 @@ void SPEFitter::FitwNummethod( TH1 *hspec )
   
   Nb=0;
   
+  // 提取数据点
   for ( Int_t i=0; i<N; i++ )
     {
       xx0[i] = hspec->GetXaxis()->GetBinCenter( i+1 );
@@ -229,7 +290,7 @@ void SPEFitter::FitwNummethod( TH1 *hspec )
       
     }
 
-  
+  // 创建Minuit2优化器进行拟合
   mNum = new ROOT::Minuit2::Minuit2Minimizer();
   
   ROOT::Math::Functor FCA;
@@ -237,6 +298,7 @@ void SPEFitter::FitwNummethod( TH1 *hspec )
   
   mNum->SetFunction(FCA);
   
+  // 设置拟合参数
   mNum->SetLimitedVariable( 0, "Norm", num.Norm, num.Norm*0.01, num.Norm*0.75, num.Norm*1.25 ); // !!!
   mNum->SetLimitedVariable( 1, "Q0", num.Q0, TMath::Abs( num.Q0 )*0.01+0.001*num.s0, num.Q0-0.5*num.s0, num.Q0+0.5*num.s0 );
   mNum->SetLimitedVariable( 2, "s0", num.s0, num.s0*0.01, num.s0*0.5, num.s0*1.5 );
@@ -248,7 +310,7 @@ void SPEFitter::FitwNummethod( TH1 *hspec )
   mNum->SetLimitedVariable( 6, "PAR3", num.spef.params[2], num.spef.params[2]*0.001, num.spef.params[2]*0.01, num.spef.params[2]*5.0 );
   mNum->SetLimitedVariable( 7, "PAR4", num.spef.params[3], 0.01, 0.0, 0.65 );
   
-  
+  // 配置优化器
   mNum->SetMaxFunctionCalls(1.E9);
   mNum->SetMaxIterations(1.E9);
   mNum->SetTolerance(0.01);
@@ -257,7 +319,7 @@ void SPEFitter::FitwNummethod( TH1 *hspec )
   mNum->Minimize();
   mNum->Hesse();
   
-  
+  // 尝试多次拟合以获得更好结果
   Int_t ifits = 0;
   while( mNum->Status()!=0 && ifits<4 )
     { 
@@ -279,6 +341,7 @@ void SPEFitter::FitwNummethod( TH1 *hspec )
 
   fit_status = mNum->Status();
   
+  // 输出拟合结果
   cout << " * " << endl;
   cout << " * Minimization results "  << endl;
   cout << " * " << endl;
@@ -291,6 +354,7 @@ void SPEFitter::FitwNummethod( TH1 *hspec )
   const double *pars = mNum->X();  
   const double *erpars = mNum->Errors();
     
+  // 保存拟合参数及误差
   for ( int i=0; i<ndim; i++ )
     {
       cout << " * " << setw(10)  << mNum->VariableName(i) << " : " << Form( "%.5f", pars[i] ) << " +/- " << Form( "%.5f", erpars[i] ) << endl; 
@@ -301,6 +365,7 @@ void SPEFitter::FitwNummethod( TH1 *hspec )
             
     }
 
+  // 计算拟合优度
   ndof = Nb-num.spef.nparams-4; 
   cout << " * " << setw(10) << "NDOF" << " : " << ndof << endl;
   
@@ -314,6 +379,12 @@ void SPEFitter::FitwNummethod( TH1 *hspec )
 
 }
 
+/**
+ * @brief 使用离散傅里叶变换方法进行拟合
+ * @param hspec 电荷谱直方图
+ * 
+ * 使用离散傅里叶变换方法对PMT电荷谱进行完整拟合，提取所有参数
+ */
 void SPEFitter::FitwDFTmethod( TH1 *hspec )
 {
   N = hspec->GetXaxis()->GetNbins();
@@ -418,6 +489,12 @@ void SPEFitter::FitwDFTmethod( TH1 *hspec )
   
 }
 
+/**
+ * @brief 使用PMT模型进行拟合
+ * @param hspec 电荷谱直方图
+ * 
+ * 使用PMT模型对电荷谱进行拟合，提取PMT增益及其他参数
+ */
 void SPEFitter::FitwPMTModel( TH1 *hspec )
 {
   N = hspec->GetXaxis()->GetNbins();

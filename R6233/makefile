@@ -1,4 +1,3 @@
-
 srcs = ana.cc
 
 objs = $(srcs:.cc=.o)
@@ -21,6 +20,9 @@ ROOTLIBS = -L/opt/root/lib -lCore -lImt -lRIO -lNet -lHist -lGraf -lGraf3d -lGpa
 # rootlibs = $(shell root-config --glibs) -lMinuit -lMinuit2 -lfftw3 -lm -L/$(GSL)/ -lgsl -lMinuit2 -lfftw3 -lgslcblas -L$(PMTCALIB)/lib -lPMTCalib
 rootlibs =-L$(PMTCALIB)/lib -lPMTCalib $(ROOTLIBS) -lMinuit -lMinuit2 -lGeom -lXMLIO -lfftw3 -L/$(GSL)/lib -lgsl -lgslcblas 
 
+# 主库路径
+PMTCALIB_LIB = $(PMTCALIB)/lib/libPMTCalib.so
+
 # targets
 
 all	: start $(exe) end
@@ -31,8 +33,8 @@ start	:
 	@echo ''
 	@rm -f ./#* ./*~ ./*.*~	
 
-$(exe)	: $(objs) 
-	@$(cxx) $(cxxflags) -o $@ $^ $(rootlibs)
+$(exe)	: $(objs) $(PMTCALIB_LIB)
+	@$(cxx) $(cxxflags) -o $@ $(objs) $(rootlibs)
 	@echo ' * building ( exe )  :' $@
 	@echo ''
 
